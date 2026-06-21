@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>A CS Prep Buddy</title>
+<title>CS Prep Buddy</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -378,7 +378,7 @@
       <div class="app-logo">
         <div class="logo-icon">🎓</div>
         <div style="flex:1;min-width:0;">
-          <div class="logo-text">CS Prep Console</div>
+          <div class="logo-text">CS Study Generator</div>
           <div class="logo-sub">80% marks · 24 chapters</div>
         </div>
         <div class="logo-actions">
@@ -396,7 +396,7 @@
 
       <!-- Google Drive connect pill -->
       <div class="drive-pill" id="drivePill" onclick="handleDrivePillClick()" title="Connect your Google Drive">
-        <span id="driveIcon" style="color:#ed8936;">🔌</span>
+        <span id="driveIcon" style="color:#ed8936;">☁️</span>
         <span class="drive-pill-label" id="driveLabel">Connect Google Drive</span>
       </div>
 
@@ -849,12 +849,22 @@ async function openDrivePicker() {
       body.innerHTML = `<div class="drive-picker-empty">No .md study files found in your "csprep" folder yet.<br>Save one first!</div>`;
       return;
     }
-    body.innerHTML = files.map(f => `
-      <div class="drive-file-item" onclick="loadMdFromDrivePicker('${f.id}', ${JSON.stringify(f.name)})">
+    body.innerHTML = files.map((f, i) => `
+      <div class="drive-file-item" id="drive-file-${i}">
         <span>📄</span>
         <span class="drive-file-name">${escapeHtml(f.name)}</span>
         <span class="drive-file-date">${formatDriveDate(f.modifiedTime)}</span>
       </div>`).join("");
+
+    // Bind click handlers directly (more reliable than inline onclick for
+    // dynamically injected HTML — avoids any quoting/escaping or timing
+    // edge cases with file names containing special characters).
+    files.forEach((f, i) => {
+      const el = document.getElementById(`drive-file-${i}`);
+      if (el) {
+        el.addEventListener("click", () => loadMdFromDrivePicker(f.id, f.name));
+      }
+    });
   } catch (e) {
     body.innerHTML = `<div class="drive-picker-empty">⚠️ Could not load Drive files: ${escapeHtml(e.message)}</div>`;
   }
