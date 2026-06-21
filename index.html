@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CS Study Generator</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
@@ -31,6 +32,26 @@
   .model-pill-label { font-size: 11px; color: #718096; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
   .model-pill-name { font-size: 11px; font-weight: 600; color: #a0aec0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
   .pill-edit { font-size: 11px; color: #4a5568; margin-left: 2px; flex-shrink: 0; }
+
+  /* Google Drive connect pill */
+  .drive-pill { display: flex; align-items: center; gap: 7px; background: #1a2035; border: 1px solid #2d3748; border-radius: 20px; padding: 6px 12px; margin-bottom: 12px; cursor: pointer; transition: all 0.15s; width: 100%; font-size: 12px; }
+  .drive-pill:hover { border-color: #667eea; }
+  .drive-pill.connected { border-color: #48bb78; background: rgba(72,187,120,0.08); }
+  .drive-pill.connected:hover { border-color: #48bb78; }
+  .drive-pill-label { color: #a0aec0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; text-align: left; }
+  .drive-pill.connected .drive-pill-label { color: #68d391; }
+
+  /* Drive file picker modal (reuses settings-overlay look) */
+  .drive-picker-panel { background: #111827; border: 1px solid #2d3748; border-radius: 16px; width: 100%; max-width: 460px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.7); }
+  .drive-picker-header { padding: 18px 20px; border-bottom: 1px solid #2d3748; display: flex; align-items: center; justify-content: space-between; }
+  .drive-picker-header h3 { font-size: 15px; font-weight: 700; color: #f7fafc; }
+  .drive-picker-body { padding: 10px; overflow-y: auto; flex: 1; }
+  .drive-file-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+  .drive-file-item:hover { background: #1e2a3a; }
+  .drive-file-name { flex: 1; font-size: 13px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .drive-file-date { font-size: 11px; color: #4a5568; }
+  .drive-picker-empty { padding: 30px 20px; text-align: center; color: #718096; font-size: 13px; }
+  .drive-picker-footer { padding: 14px 20px; border-top: 1px solid #2d3748; }
 
   /* Subject form */
   .subject-form { display: flex; flex-direction: column; gap: 8px; }
@@ -335,6 +356,22 @@
     </div><!-- settings-panel -->
   </div><!-- settings-overlay -->
 
+  <!-- DRIVE FILE PICKER MODAL -->
+  <div class="settings-overlay" id="drivePickerOverlay" onclick="overlayCloseDrivePicker(event)">
+    <div class="drive-picker-panel" id="drivePickerPanel">
+      <div class="drive-picker-header">
+        <h3>📁 Load from Google Drive — csprep</h3>
+        <button class="close-btn" onclick="closeDrivePicker()">✕</button>
+      </div>
+      <div class="drive-picker-body" id="drivePickerBody">
+        <div class="drive-picker-empty">Loading files…</div>
+      </div>
+      <div class="drive-picker-footer">
+        <button class="io-btn" onclick="document.getElementById('loadMdInput').click(); closeDrivePicker();" style="width:100%;">📂 Load from this device instead</button>
+      </div>
+    </div>
+  </div><!-- drive-picker-overlay -->
+
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-header">
@@ -357,12 +394,18 @@
         <span class="pill-edit">✎</span>
       </div>
 
+      <!-- Google Drive connect pill -->
+      <div class="drive-pill" id="drivePill" onclick="handleDrivePillClick()" title="Connect your Google Drive">
+        <span id="driveIcon">🔌</span>
+        <span class="drive-pill-label" id="driveLabel">Connect Google Drive</span>
+      </div>
+
       <div class="subject-form">
         <input type="text" id="subjectInput" placeholder="e.g. Operating Systems, DSA…" maxlength="80" />
         <button class="generate-btn" id="generateBtn" onclick="generateSyllabus()">⚡ Generate Syllabus</button>
         <div style="display:flex; gap:8px;">
           <button class="io-btn" id="saveMdBtn" onclick="saveStudyMaterial()" title="Save syllabus + chapters + MCQs as Markdown">💾 Save .md</button>
-          <button class="io-btn" onclick="document.getElementById('loadMdInput').click()" title="Load a previously saved .md study file">📂 Load .md</button>
+          <button class="io-btn" onclick="openLoadDialog()" title="Load a previously saved .md study file">📂 Load .md</button>
           <input type="file" id="loadMdInput" accept=".md,.markdown,text/markdown,text/plain" style="display:none" onchange="loadStudyMaterial(event)" />
         </div>
       </div>
@@ -520,6 +563,309 @@ function loadCfg() {
     if (saved) cfg = { ...cfg, ...JSON.parse(saved) };
   } catch {}
 }
+
+// ============================================================
+//  GOOGLE DRIVE INTEGRATION
+// ============================================================
+// Each student signs in with THEIR OWN Google account. Files are saved
+// into THEIR OWN Drive, inside a folder named "csprep" that this app
+// creates automatically. We never see or touch anyone else's Drive.
+//
+// Scope used: drive.file — the most restrictive Drive scope. It only
+// lets this app see/edit files that THIS app itself created or that the
+// student explicitly opens with it. It cannot browse the rest of the
+// student's Drive.
+//
+// ⚠️ SETUP REQUIRED: paste your own OAuth Client ID below. Until you do,
+// Drive features stay hidden and Save/Load just work locally (no change
+// in behavior for students until this is configured).
+const GOOGLE_CLIENT_ID = "466974067898-o74o0941spbnit82vces1b9vvittsei9.apps.googleusercontent.com";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const DRIVE_FOLDER_NAME = "csprep";
+
+let driveState = {
+  tokenClient: null,
+  accessToken: null,
+  tokenExpiresAt: 0,
+  folderId: null,
+  userEmail: null
+};
+
+function driveConfigured() {
+  return GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes("YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE");
+}
+
+function initGoogleDrive() {
+  const pill = document.getElementById("drivePill");
+  if (!driveConfigured()) {
+    // Hide the pill entirely until a real Client ID is set — keeps the
+    // app fully functional with local save/load only.
+    if (pill) pill.style.display = "none";
+    return;
+  }
+  if (pill) pill.style.display = "flex";
+
+  // Restore a still-valid token from a previous session, if any.
+  try {
+    const saved = JSON.parse(sessionStorage.getItem("cs_drive_token") || "null");
+    if (saved && saved.accessToken && saved.expiresAt > Date.now()) {
+      driveState.accessToken = saved.accessToken;
+      driveState.tokenExpiresAt = saved.expiresAt;
+      driveState.userEmail = saved.userEmail || null;
+      updateDrivePillUI(true);
+    }
+  } catch {}
+
+  // Wait for the Google Identity Services script to be ready.
+  const waitForGis = setInterval(() => {
+    if (window.google && google.accounts && google.accounts.oauth2) {
+      clearInterval(waitForGis);
+      driveState.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: DRIVE_SCOPE,
+        callback: onDriveTokenResponse
+      });
+    }
+  }, 150);
+}
+
+function onDriveTokenResponse(resp) {
+  if (resp.error) {
+    showToast("⚠️ Google Drive sign-in was cancelled or failed");
+    return;
+  }
+  driveState.accessToken = resp.access_token;
+  driveState.tokenExpiresAt = Date.now() + (resp.expires_in || 3500) * 1000;
+  try {
+    sessionStorage.setItem("cs_drive_token", JSON.stringify({
+      accessToken: driveState.accessToken,
+      expiresAt: driveState.tokenExpiresAt,
+      userEmail: driveState.userEmail
+    }));
+  } catch {}
+  updateDrivePillUI(true);
+  showToast("✅ Connected to your Google Drive");
+
+  // Continue whatever action triggered the sign-in.
+  if (driveState._pendingAction) {
+    const action = driveState._pendingAction;
+    driveState._pendingAction = null;
+    action();
+  }
+}
+
+function updateDrivePillUI(connected) {
+  const pill = document.getElementById("drivePill");
+  const icon = document.getElementById("driveIcon");
+  const label = document.getElementById("driveLabel");
+  if (!pill) return;
+  if (connected) {
+    pill.classList.add("connected");
+    if (icon) icon.textContent = "✅";
+    if (label) label.textContent = "Google Drive connected";
+  } else {
+    pill.classList.remove("connected");
+    if (icon) icon.textContent = "🔌";
+    if (label) label.textContent = "Connect Google Drive";
+  }
+}
+
+function isDriveSignedIn() {
+  return !!driveState.accessToken && driveState.tokenExpiresAt > Date.now();
+}
+
+function handleDrivePillClick() {
+  if (!driveConfigured()) {
+    showToast("⚠️ Google Drive isn't configured yet — see GOOGLE_CLIENT_ID in the code");
+    return;
+  }
+  if (isDriveSignedIn()) {
+    // Offer to disconnect.
+    if (confirm("Disconnect Google Drive? You can reconnect anytime.")) {
+      driveState.accessToken = null;
+      driveState.tokenExpiresAt = 0;
+      try { sessionStorage.removeItem("cs_drive_token"); } catch {}
+      updateDrivePillUI(false);
+      showToast("Disconnected from Google Drive");
+    }
+    return;
+  }
+  requestDriveSignIn();
+}
+
+function requestDriveSignIn(onSuccess) {
+  if (!driveState.tokenClient) {
+    showToast("⚠️ Google sign-in is still loading — try again in a moment");
+    return;
+  }
+  driveState._pendingAction = onSuccess || null;
+  driveState.tokenClient.requestAccessToken({ prompt: isDriveSignedIn() ? "" : "consent" });
+}
+
+async function driveFetch(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...(options.headers || {}), "Authorization": `Bearer ${driveState.accessToken}` }
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Drive API ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return res;
+}
+
+// Find the student's "csprep" folder, creating it on first use.
+async function ensureCsprepFolder() {
+  if (driveState.folderId) return driveState.folderId;
+
+  const q = encodeURIComponent(
+    `name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+  );
+  const listRes = await driveFetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&spaces=drive`
+  );
+  const listData = await listRes.json();
+
+  if (listData.files && listData.files.length > 0) {
+    driveState.folderId = listData.files[0].id;
+    return driveState.folderId;
+  }
+
+  // Not found — create it.
+  const createRes = await driveFetch("https://www.googleapis.com/drive/v3/files", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType: "application/vnd.google-apps.folder" })
+  });
+  const created = await createRes.json();
+  driveState.folderId = created.id;
+  return driveState.folderId;
+}
+
+// Upload (or overwrite) a .md file inside the csprep folder.
+async function uploadMdToDrive(filename, content) {
+  const folderId = await ensureCsprepFolder();
+
+  // Check if a file with this name already exists in the folder → update it instead of duplicating.
+  const q = encodeURIComponent(`name='${filename}' and '${folderId}' in parents and trashed=false`);
+  const existingRes = await driveFetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&spaces=drive`
+  );
+  const existing = await existingRes.json();
+  const existingId = existing.files && existing.files[0] ? existing.files[0].id : null;
+
+  const metadata = existingId
+    ? { name: filename }
+    : { name: filename, parents: [folderId], mimeType: "text/markdown" };
+
+  const boundary = "csprep-boundary-" + Math.random().toString(36).slice(2);
+  const body =
+    `--${boundary}\r\n` +
+    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+    `${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Type: text/markdown\r\n\r\n` +
+    `${content}\r\n` +
+    `--${boundary}--`;
+
+  const uploadUrl = existingId
+    ? `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
+    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+
+  await driveFetch(uploadUrl, {
+    method: existingId ? "PATCH" : "POST",
+    headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+    body
+  });
+
+  return { overwritten: !!existingId };
+}
+
+// List .md files inside the csprep folder, newest first.
+async function listCsprepMdFiles() {
+  const folderId = await ensureCsprepFolder();
+  const q = encodeURIComponent(`'${folderId}' in parents and trashed=false and name contains '.md'`);
+  const res = await driveFetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&spaces=drive`
+  );
+  const data = await res.json();
+  return data.files || [];
+}
+
+async function downloadDriveFileContent(fileId) {
+  const res = await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+  return res.text();
+}
+
+// ── Load dialog: Drive picker if signed in, else local file input ──────────
+
+function openLoadDialog() {
+  if (driveConfigured() && isDriveSignedIn()) {
+    openDrivePicker();
+    return;
+  }
+  if (driveConfigured()) {
+    // Not signed in yet — let the student choose rather than forcing a popup.
+    const wantsDrive = confirm(
+      'Load from Google Drive ("csprep" folder)?\n\nOK = Connect Google Drive\nCancel = Choose a local file instead'
+    );
+    if (wantsDrive) {
+      requestDriveSignIn(() => openDrivePicker());
+      return;
+    }
+  }
+  document.getElementById("loadMdInput").click();
+}
+
+async function openDrivePicker() {
+  const overlay = document.getElementById("drivePickerOverlay");
+  const body = document.getElementById("drivePickerBody");
+  overlay.classList.add("open");
+  body.innerHTML = `<div class="drive-picker-empty">Loading files from "csprep"…</div>`;
+
+  try {
+    const files = await listCsprepMdFiles();
+    if (!files.length) {
+      body.innerHTML = `<div class="drive-picker-empty">No .md study files found in your "csprep" folder yet.<br>Save one first!</div>`;
+      return;
+    }
+    body.innerHTML = files.map(f => `
+      <div class="drive-file-item" onclick="loadMdFromDrivePicker('${f.id}', ${JSON.stringify(f.name)})">
+        <span>📄</span>
+        <span class="drive-file-name">${escapeHtml(f.name)}</span>
+        <span class="drive-file-date">${formatDriveDate(f.modifiedTime)}</span>
+      </div>`).join("");
+  } catch (e) {
+    body.innerHTML = `<div class="drive-picker-empty">⚠️ Could not load Drive files: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function formatDriveDate(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch { return ""; }
+}
+
+async function loadMdFromDrivePicker(fileId, fileName) {
+  closeDrivePicker();
+  try {
+    const text = await downloadDriveFileContent(fileId);
+    parseStudyMaterial(text);
+    showToast(`📂 Loaded "${fileName}" from Google Drive`);
+  } catch (e) {
+    showToast("❌ Could not load file from Drive: " + e.message, 5000);
+  }
+}
+
+function closeDrivePicker() {
+  document.getElementById("drivePickerOverlay").classList.remove("open");
+}
+
+function overlayCloseDrivePicker(e) {
+  if (e.target.id === "drivePickerOverlay") closeDrivePicker();
+}
+
 function saveCfg() {
   try { localStorage.setItem("cs_study_cfg", JSON.stringify(cfg)); } catch {}
 }
@@ -1046,9 +1392,7 @@ function revealExplanation(id) {
 // embedded as a fenced ```json block (CHAPTER_MCQ_DATA) so the file
 // stays fully readable but is also exactly re-parseable.
 
-function saveStudyMaterial() {
-  if (!syllabus.length) { showToast("⚠️ Nothing to save yet — generate a syllabus first"); return; }
-
+function buildStudyMaterialMarkdown() {
   const generatedChapters = Object.keys(chapterCache).length;
   let md = `# ${currentSubject || "CS Study Material"}\n\n`;
   md += `> Generated with CS Study Generator · ${syllabus.length} chapters · ${generatedChapters} with content · Model: ${cfg.model}\n\n`;
@@ -1076,18 +1420,51 @@ function saveStudyMaterial() {
     md += `---\n\n`;
   });
 
+  return { md, generatedChapters };
+}
+
+function safeFileName() {
+  return (currentSubject || "study-material").trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "study-material";
+}
+
+function downloadMdLocally(filename, md) {
   const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const safeName = (currentSubject || "study-material").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "study-material";
   a.href = url;
-  a.download = `${safeName}.md`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
 
-  showToast(`💾 Saved "${currentSubject}" (${syllabus.length} chapters, ${generatedChapters} with content)`);
+function saveStudyMaterial() {
+  if (!syllabus.length) { showToast("⚠️ Nothing to save yet — generate a syllabus first"); return; }
+
+  const { md, generatedChapters } = buildStudyMaterialMarkdown();
+  const filename = `${safeFileName()}.md`;
+
+  if (driveConfigured() && isDriveSignedIn()) {
+    saveToDrive(filename, md, generatedChapters);
+  } else {
+    downloadMdLocally(filename, md);
+    showToast(`💾 Saved "${currentSubject}" locally (${syllabus.length} chapters, ${generatedChapters} with content)`);
+  }
+}
+
+async function saveToDrive(filename, md, generatedChapters) {
+  const btn = document.getElementById("saveMdBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Saving…"; }
+  try {
+    const { overwritten } = await uploadMdToDrive(filename, md);
+    showToast(`☁️ ${overwritten ? "Updated" : "Saved"} "${filename}" in Drive → csprep (${syllabus.length} chapters, ${generatedChapters} with content)`);
+  } catch (e) {
+    showToast(`⚠️ Drive save failed, downloading locally instead: ${e.message}`, 5000);
+    downloadMdLocally(filename, md);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = "💾 Save .md"; }
 }
 
 function escapeForComment(s) { return String(s).replace(/-->/g, "--&gt;"); }
@@ -1218,6 +1595,7 @@ function showHero() {
 // ============================================================
 loadCfg();
 updatePill();
+initGoogleDrive();
 document.getElementById("subjectInput").addEventListener("keydown", e => {
   if (e.key === "Enter") generateSyllabus();
 });
