@@ -41,6 +41,9 @@
   .generate-btn:hover { opacity: 0.9; }
   .generate-btn:active { transform: scale(0.98); }
   .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .io-btn { flex: 1; background: #1a2035; border: 1px solid #2d3748; border-radius: 8px; padding: 8px 10px; color: #a0aec0; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .io-btn:hover { border-color: #667eea; color: #7f9cf5; background: rgba(102,126,234,0.1); }
+  .io-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* Chapters list */
   .chapters-list { flex: 1; overflow-y: auto; padding: 10px 8px; }
@@ -174,6 +177,18 @@
   /* MCQ */
   .mcq-section { margin-top: 36px; padding-top: 28px; border-top: 1px solid #2d3748; }
   .mcq-section h2 { font-size: 20px; font-weight: 700; color: #f7fafc; margin-bottom: 6px; }
+
+  /* Reference videos */
+  .video-section { margin-top: 36px; padding-top: 28px; border-top: 1px solid #2d3748; }
+  .video-section h2 { font-size: 20px; font-weight: 700; color: #f7fafc; margin-bottom: 6px; }
+  .video-intro { font-size: 13px; color: #718096; margin-bottom: 18px; }
+  .video-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .video-card { display: block; background: #161b27; border: 1px solid #2d3748; border-radius: 12px; padding: 16px; text-decoration: none; transition: all 0.15s; }
+  .video-card:hover { border-color: #667eea; background: #1a2035; transform: translateY(-1px); }
+  .video-thumb { width: 100%; aspect-ratio: 16/9; border-radius: 8px; background: linear-gradient(135deg, #1e2a3a, #161b27); border: 1px solid #2d3748; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 10px; }
+  .video-title { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 4px; line-height: 1.4; }
+  .video-meta { font-size: 11px; color: #718096; display: flex; align-items: center; gap: 5px; }
+  .video-tag { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 2px 7px; border-radius: 10px; background: rgba(102,126,234,0.15); color: #a78bfa; margin-bottom: 8px; }
   .mcq-intro { font-size: 13px; color: #718096; margin-bottom: 24px; }
   .mcq-card { background: #161b27; border: 1px solid #2d3748; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
   .mcq-difficulty { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -190,6 +205,7 @@
   .opt-label { width: 22px; min-width: 22px; height: 22px; border-radius: 50%; background: #2d3748; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #718096; }
   .mcq-option.correct .opt-label { background: #48bb78; color: white; }
   .mcq-option.incorrect .opt-label, .mcq-option.selected-wrong .opt-label { background: #fc8181; color: white; }
+  .opt-mark { font-size: 15px; margin-left: 8px; flex-shrink: 0; line-height: 1; }
   .reveal-btn { background: rgba(102,126,234,0.15); border: 1px solid rgba(102,126,234,0.3); border-radius: 8px; padding: 8px 14px; color: #7f9cf5; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
   .reveal-btn:hover { background: rgba(102,126,234,0.25); }
   .explanation-box { margin-top: 14px; padding: 14px; background: rgba(102,126,234,0.07); border: 1px solid rgba(102,126,234,0.2); border-radius: 8px; font-size: 13px; line-height: 1.7; color: #a0aec0; display: none; }
@@ -344,6 +360,11 @@
       <div class="subject-form">
         <input type="text" id="subjectInput" placeholder="e.g. Operating Systems, DSA…" maxlength="80" />
         <button class="generate-btn" id="generateBtn" onclick="generateSyllabus()">⚡ Generate Syllabus</button>
+        <div style="display:flex; gap:8px;">
+          <button class="io-btn" id="saveMdBtn" onclick="saveStudyMaterial()" title="Save syllabus + chapters + MCQs as Markdown">💾 Save .md</button>
+          <button class="io-btn" onclick="document.getElementById('loadMdInput').click()" title="Load a previously saved .md study file">📂 Load .md</button>
+          <input type="file" id="loadMdInput" accept=".md,.markdown,text/markdown,text/plain" style="display:none" onchange="loadStudyMaterial(event)" />
+        </div>
       </div>
     </div>
 
@@ -931,12 +952,41 @@ function renderChapter(idx, data) {
       <p class="mcq-intro">3 questions — Easy, Hard, Very Hard. Pick an answer to auto-reveal, or click "Show Explanation".</p>
       ${data.mcqs.map((q, qi) => renderMCQ(q, idx, qi)).join("")}
     </div>
+    <div class="video-section">
+      <h2>📺 Reference Videos</h2>
+      <p class="video-intro">Curated YouTube searches for this chapter — opens real, current top results in a new tab.</p>
+      ${renderVideoCards(syllabus[idx], currentSubject)}
+    </div>
     <div class="chapter-nav">
       <button class="nav-btn" onclick="loadChapter(${idx-1})" ${idx===0?"disabled":""}>← Previous</button>
       <span style="font-size:13px;color:#4a5568;">Chapter ${idx+1} / ${syllabus.length}</span>
       <button class="nav-btn primary" onclick="loadChapter(${idx+1})" ${idx===syllabus.length-1?"disabled":""}>Next →</button>
     </div>
   </div>`);
+}
+
+function renderVideoCards(chapterTitle, subject) {
+  const cleanTitle = chapterTitle.replace(/[^\w\s-]/g, " ").replace(/\s+/g, " ").trim();
+  const angles = [
+    { tag: "Explainer",        icon: "🎯", q: `${cleanTitle} explained`,            blurb: "Core concept walkthrough" },
+    { tag: "Interview Prep",   icon: "💼", q: `${cleanTitle} interview questions ${subject}`, blurb: "Common interview angles" },
+    { tag: "Deep Dive",        icon: "🔬", q: `${cleanTitle} ${subject} tutorial`,   blurb: "Detailed tutorial / crash course" }
+  ];
+  return `<div class="video-grid">
+    ${angles.map(a => {
+      const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(a.q);
+      return `<a class="video-card" href="${url}" target="_blank" rel="noopener noreferrer">
+        <div class="video-tag">${a.tag}</div>
+        <div class="video-thumb">${a.icon}</div>
+        <div class="video-title">${escapeHtml(a.q)}</div>
+        <div class="video-meta">▶ ${a.blurb} · YouTube search</div>
+      </a>`;
+    }).join("")}
+  </div>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
 function renderMCQ(q, chIdx, qIdx) {
@@ -947,7 +997,8 @@ function renderMCQ(q, chIdx, qIdx) {
   const opts      = (q.options||[]).map((opt,oi)=>`
     <div class="mcq-option" id="${id}-opt-${oi}" onclick="selectOption('${id}',${oi},${q.correct})">
       <div class="opt-label">${letters[oi]}</div>
-      <div>${opt.replace(/^[A-D]\)\s*/,"")}</div>
+      <div style="flex:1;">${opt.replace(/^[A-D]\)\s*/,"")}</div>
+      <span class="opt-mark" id="${id}-mark-${oi}"></span>
     </div>`).join("");
   const wrongExp  = Object.entries(q.explanation_wrong||{}).map(([k,v])=>
     `<div style="margin-top:8px;"><span style="color:#fc8181;">Option ${letters[parseInt(k)]}:</span> ${v}</div>`).join("");
@@ -968,9 +1019,16 @@ function renderMCQ(q, chIdx, qIdx) {
 function selectOption(id, selected, correct) {
   document.querySelectorAll(`[id^="${id}-opt-"]`).forEach((el,i)=>{
     el.onclick = null;
-    if (i===correct) el.classList.add("correct");
-    else if (i===selected) el.classList.add("selected-wrong");
-    else el.classList.add("incorrect");
+    const mark = document.getElementById(`${id}-mark-${i}`);
+    if (i===correct) {
+      el.classList.add("correct");
+      if (mark) mark.textContent = "✅";
+    } else if (i===selected) {
+      el.classList.add("selected-wrong");
+      if (mark) mark.textContent = "❌";
+    } else {
+      el.classList.add("incorrect");
+    }
   });
   revealExplanation(id);
 }
@@ -979,6 +1037,135 @@ function revealExplanation(id) {
   const btn = document.getElementById(`${id}-reveal`);
   if (box) box.classList.add("visible");
   if (btn) btn.style.display = "none";
+}
+
+// ============================================================
+//  SAVE / LOAD STUDY MATERIAL AS .md
+// ============================================================
+// File format: human-readable Markdown, with each chapter's MCQs
+// embedded as a fenced ```json block (CHAPTER_MCQ_DATA) so the file
+// stays fully readable but is also exactly re-parseable.
+
+function saveStudyMaterial() {
+  if (!syllabus.length) { showToast("⚠️ Nothing to save yet — generate a syllabus first"); return; }
+
+  const generatedChapters = Object.keys(chapterCache).length;
+  let md = `# ${currentSubject || "CS Study Material"}\n\n`;
+  md += `> Generated with CS Study Generator · ${syllabus.length} chapters · ${generatedChapters} with content · Model: ${cfg.model}\n\n`;
+  md += `<!-- CS_STUDY_GENERATOR_EXPORT v1 -->\n`;
+  md += `<!-- SUBJECT: ${escapeForComment(currentSubject || "")} -->\n\n`;
+
+  md += `## Syllabus\n\n`;
+  syllabus.forEach((title, i) => {
+    md += `${i + 1}. ${title}${chapterCache[i] ? "" : "  _(not yet generated)_"}\n`;
+  });
+  md += `\n---\n\n`;
+
+  syllabus.forEach((title, i) => {
+    const data = chapterCache[i];
+    md += `## Chapter ${i + 1}: ${title}\n\n`;
+    if (!data) {
+      md += `_This chapter was not generated before saving._\n\n---\n\n`;
+      return;
+    }
+    md += `${data.content}\n\n`;
+    md += `### MCQs\n\n`;
+    md += "```json CHAPTER_MCQ_DATA\n";
+    md += JSON.stringify(data.mcqs, null, 2);
+    md += "\n```\n\n";
+    md += `---\n\n`;
+  });
+
+  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const safeName = (currentSubject || "study-material").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "study-material";
+  a.href = url;
+  a.download = `${safeName}.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+
+  showToast(`💾 Saved "${currentSubject}" (${syllabus.length} chapters, ${generatedChapters} with content)`);
+}
+
+function escapeForComment(s) { return String(s).replace(/-->/g, "--&gt;"); }
+
+function loadStudyMaterial(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = ""; // allow re-selecting the same file later
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      parseStudyMaterial(reader.result);
+    } catch (e) {
+      showToast("❌ Could not load file: " + e.message, 5000);
+    }
+  };
+  reader.onerror = () => showToast("❌ Failed to read file", 4000);
+  reader.readAsText(file);
+}
+
+function parseStudyMaterial(md) {
+  // 1) Subject
+  const subjectMatch = md.match(/<!-- SUBJECT: ([\s\S]*?) -->/);
+  let subject = subjectMatch ? subjectMatch[1].replace(/--&gt;/g, "-->").trim() : "";
+  if (!subject) {
+    const h1 = md.match(/^#\s+(.+)$/m);
+    subject = h1 ? h1[1].trim() : "Imported Study Material";
+  }
+
+  // 2) Syllabus titles (numbered list before the first "---")
+  const syllabusBlockMatch = md.match(/## Syllabus\s*\n([\s\S]*?)\n---/);
+  if (!syllabusBlockMatch) throw new Error("No syllabus section found — is this a valid export?");
+  const titles = [...syllabusBlockMatch[1].matchAll(/^\d+\.\s+(.+?)(?:\s+_\(not yet generated\)_)?$/gm)]
+    .map(m => m[1].trim());
+  if (!titles.length) throw new Error("Could not parse any chapter titles.");
+
+  // 3) Chapter sections: split on "## Chapter N: Title"
+  const chapterRegex = /## Chapter (\d+): (.+?)\n\n([\s\S]*?)(?=\n## Chapter \d+:|$)/g;
+  const newCache = {};
+  let m;
+  while ((m = chapterRegex.exec(md)) !== null) {
+    const idx = parseInt(m[1], 10) - 1;
+    const body = m[3];
+
+    if (/_This chapter was not generated before saving\._/.test(body)) continue;
+
+    const mcqBlockMatch = body.match(/```json CHAPTER_MCQ_DATA\n([\s\S]*?)\n```/);
+    let mcqs = [];
+    let content = body;
+
+    if (mcqBlockMatch) {
+      try { mcqs = JSON.parse(mcqBlockMatch[1]); } catch { mcqs = []; }
+      // Content is everything before "### MCQs"
+      content = body.split(/\n### MCQs\n/)[0].trim();
+    } else {
+      content = body.replace(/\n---\s*$/, "").trim();
+    }
+    // Strip a trailing standalone "---" left over from the template.
+    content = content.replace(/\n---\s*$/, "").trim();
+
+    newCache[idx] = { content, mcqs };
+  }
+
+  // 4) Commit to app state.
+  syllabus = titles;
+  chapterCache = newCache;
+  currentSubject = subject;
+  activeChapter = -1;
+
+  document.getElementById("subjectInput").value = subject;
+  const se = document.getElementById("sidebarEmpty");
+  if (se) se.remove();
+  renderSidebar();
+  showHero();
+
+  const loadedCount = Object.keys(newCache).length;
+  showToast(`📂 Loaded "${subject}" — ${titles.length} chapters (${loadedCount} with content)`);
 }
 
 function parseMarkdown(md) {
