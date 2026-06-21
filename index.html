@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CS Prep</title>
+<title>A CS Prep Buddy</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -378,7 +378,7 @@
       <div class="app-logo">
         <div class="logo-icon">🎓</div>
         <div style="flex:1;min-width:0;">
-          <div class="logo-text">CS Prep</div>
+          <div class="logo-text">CS Prep Console</div>
           <div class="logo-sub">80% marks · 24 chapters</div>
         </div>
         <div class="logo-actions">
@@ -396,7 +396,7 @@
 
       <!-- Google Drive connect pill -->
       <div class="drive-pill" id="drivePill" onclick="handleDrivePillClick()" title="Connect your Google Drive">
-        <span id="driveIcon">🔌</span>
+        <span id="driveIcon" style="color:#ed8936;">🔌</span>
         <span class="drive-pill-label" id="driveLabel">Connect Google Drive</span>
       </div>
 
@@ -576,9 +576,29 @@ function loadCfg() {
 // student explicitly opens with it. It cannot browse the rest of the
 // student's Drive.
 //
-// ⚠️ SETUP REQUIRED: paste your own OAuth Client ID below. Until you do,
-// Drive features stay hidden and Save/Load just work locally (no change
-// in behavior for students until this is configured).
+// SECURITY NOTE — the Client ID below is NOT a secret.
+// OAuth Client IDs for browser apps are public by design (Google's own
+// docs embed them in client-side JS) — there is no client *secret* in
+// this token-based flow, so nothing here needs to be hidden. Anyone can
+// already see this string via dev tools the instant the page loads,
+// whether it's hardcoded here or fetched from elsewhere.
+//
+// The actual security boundary is enforced server-side by Google, via
+// the "Authorized JavaScript origins" allowlist on this Client ID in
+// Cloud Console. Google's servers refuse the sign-in popup unless the
+// request comes from a domain you explicitly whitelisted — so even if
+// someone copies this entire file to their own site, the OAuth flow
+// will fail for them. To keep this tight:
+//   1. Console → APIs & Services → Credentials → this Client ID →
+//      "Authorized JavaScript origins" — list ONLY the real domain(s)
+//      this file is actually served from. Remove localhost once you
+//      stop testing locally.
+//   2. Console → OAuth consent screen — keep "Publishing status" as
+//      "Testing" (only your added test-user emails can sign in) until
+//      you're ready for any student to use it; then "Publish" it.
+//   3. Keep the scope above as drive.file — never widen it to a
+//      broader Drive scope, which would let a compromised page read a
+//      student's entire Drive instead of just its own folder.
 const GOOGLE_CLIENT_ID = "466974067898-o74o0941spbnit82vces1b9vvittsei9.apps.googleusercontent.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const DRIVE_FOLDER_NAME = "csprep";
@@ -661,11 +681,11 @@ function updateDrivePillUI(connected) {
   if (!pill) return;
   if (connected) {
     pill.classList.add("connected");
-    if (icon) icon.textContent = "✅";
+    if (icon) { icon.textContent = "✅"; icon.style.color = ""; }
     if (label) label.textContent = "Google Drive connected";
   } else {
     pill.classList.remove("connected");
-    if (icon) icon.textContent = "🔌";
+    if (icon) { icon.textContent = "🔌"; icon.style.color = "#ed8936"; }
     if (label) label.textContent = "Connect Google Drive";
   }
 }
