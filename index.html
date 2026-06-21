@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS Study Generator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+  /* Layout */
+  .app { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 300px; min-width: 300px; background: #161b27; border-right: 1px solid #2d3748; display: flex; flex-direction: column; overflow: hidden; }
+  .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+  /* Sidebar header */
+  .sidebar-header { padding: 16px 14px 14px; border-bottom: 1px solid #2d3748; flex-shrink: 0; }
+  .app-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .logo-icon { width: 34px; height: 34px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+  .logo-text { font-size: 14px; font-weight: 600; color: #f7fafc; }
+  .logo-sub { font-size: 11px; color: #718096; }
+  .logo-actions { margin-left: auto; display: flex; gap: 6px; }
+  .icon-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid #2d3748; background: #1a2035; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #718096; transition: all 0.15s; flex-shrink: 0; }
+  .icon-btn:hover { border-color: #667eea; color: #7f9cf5; background: rgba(102,126,234,0.1); }
+  .icon-btn.active { border-color: #667eea; color: #7f9cf5; background: rgba(102,126,234,0.15); }
+
+  /* Model indicator pill */
+  .model-pill { display: flex; align-items: center; gap: 6px; background: #1a2035; border: 1px solid #2d3748; border-radius: 20px; padding: 4px 10px 4px 7px; margin-bottom: 12px; cursor: pointer; transition: all 0.15s; width: 100%; }
+  .model-pill:hover { border-color: #667eea; }
+  .provider-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .model-pill-label { font-size: 11px; color: #718096; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .model-pill-name { font-size: 11px; font-weight: 600; color: #a0aec0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+  .pill-edit { font-size: 11px; color: #4a5568; margin-left: 2px; flex-shrink: 0; }
+
+  /* Subject form */
+  .subject-form { display: flex; flex-direction: column; gap: 8px; }
+  .subject-form input { background: #1a2035; border: 1px solid #2d3748; border-radius: 8px; padding: 9px 12px; color: #e2e8f0; font-size: 13px; outline: none; transition: border-color 0.2s; }
+  .subject-form input:focus { border-color: #667eea; }
+  .subject-form input::placeholder { color: #4a5568; }
+  .generate-btn { background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 8px; padding: 10px 16px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s, transform 0.1s; }
+  .generate-btn:hover { opacity: 0.9; }
+  .generate-btn:active { transform: scale(0.98); }
+  .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Chapters list */
+  .chapters-list { flex: 1; overflow-y: auto; padding: 10px 8px; }
+  .chapters-list::-webkit-scrollbar { width: 4px; }
+  .chapters-list::-webkit-scrollbar-track { background: transparent; }
+  .chapters-list::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 4px; }
+
+  .chapter-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; transition: background 0.15s; margin-bottom: 2px; }
+  .chapter-item:hover { background: #1e2a3a; }
+  .chapter-item.active { background: #1e2a3a; border-left: 3px solid #667eea; padding-left: 7px; }
+  .chapter-item.active .ch-num { background: #667eea; color: white; }
+  .ch-num { width: 24px; height: 24px; min-width: 24px; border-radius: 6px; background: #2d3748; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #a0aec0; }
+  .ch-info { flex: 1; min-width: 0; }
+  .ch-title { font-size: 12px; font-weight: 500; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ch-time { font-size: 11px; color: #4a5568; margin-top: 1px; }
+  .ch-status { width: 8px; height: 8px; border-radius: 50%; background: #2d3748; min-width: 8px; }
+  .ch-status.done { background: #48bb78; }
+  .ch-status.loading { background: #667eea; animation: pulse 1s infinite; }
+
+  /* Sidebar footer */
+  .sidebar-footer { padding: 10px 14px; border-top: 1px solid #2d3748; font-size: 11px; color: #4a5568; flex-shrink: 0; }
+
+  /* ===== SETTINGS MODAL OVERLAY ===== */
+  .settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+  .settings-overlay.open { opacity: 1; pointer-events: all; }
+  .settings-panel { background: #111827; border: 1px solid #2d3748; border-radius: 16px; width: 100%; max-width: 640px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.7); transform: scale(0.96) translateY(12px); transition: transform 0.22s ease; }
+  .settings-overlay.open .settings-panel { transform: scale(1) translateY(0); }
+  .settings-header { padding: 18px 22px 14px; border-bottom: 1px solid #2d3748; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; border-radius: 16px 16px 0 0; }
+  .settings-header h2 { font-size: 16px; font-weight: 600; color: #f7fafc; }
+  .close-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #2d3748; background: #1a2035; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #718096; transition: all 0.15s; }
+  .close-btn:hover { color: #e2e8f0; border-color: #4a5568; }
+  .settings-body { flex: 1; overflow-y: auto; padding: 20px 22px; }
+  .settings-body::-webkit-scrollbar { width: 4px; }
+  .settings-body::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 4px; }
+
+  /* Provider grid */
+  .section-label { font-size: 11px; font-weight: 700; color: #4a5568; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+  .provider-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
+  .provider-card { border: 1px solid #2d3748; border-radius: 10px; padding: 10px 12px; cursor: pointer; transition: all 0.15s; background: #1a2035; display: flex; align-items: center; gap: 8px; }
+  .provider-card:hover { border-color: #4a5568; background: #202840; }
+  .provider-card.selected { border-color: #667eea; background: rgba(102,126,234,0.12); }
+  .provider-logo { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .provider-info { flex: 1; min-width: 0; }
+  .provider-name { font-size: 12px; font-weight: 600; color: #e2e8f0; }
+  .provider-desc { font-size: 10px; color: #4a5568; margin-top: 1px; }
+  .provider-badge { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: rgba(72,187,120,0.15); color: #68d391; }
+
+  /* Form fields */
+  .field-group { margin-bottom: 16px; }
+  .field-label { font-size: 12px; font-weight: 500; color: #a0aec0; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .field-hint { font-size: 10px; color: #4a5568; margin-left: auto; }
+  .field-input { width: 100%; background: #1a2035; border: 1px solid #2d3748; border-radius: 8px; padding: 9px 12px; color: #e2e8f0; font-size: 13px; outline: none; transition: border-color 0.2s; font-family: inherit; }
+  .field-input:focus { border-color: #667eea; }
+  .field-input::placeholder { color: #4a5568; }
+  .field-input.mono { font-family: 'Fira Code', 'Courier New', monospace; font-size: 12px; }
+  .password-wrap { position: relative; }
+  .password-wrap .field-input { padding-right: 40px; }
+  .eye-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #4a5568; font-size: 15px; padding: 2px; }
+  .eye-btn:hover { color: #a0aec0; }
+
+  /* Model quick-select */
+  .model-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .model-chip { font-size: 11px; padding: 3px 9px; border-radius: 12px; border: 1px solid #2d3748; background: #1a2035; color: #718096; cursor: pointer; transition: all 0.15s; font-family: 'Fira Code', 'Courier New', monospace; }
+  .model-chip:hover { border-color: #667eea; color: #7f9cf5; }
+  .model-chip.active { border-color: #667eea; background: rgba(102,126,234,0.15); color: #7f9cf5; }
+
+  /* Token slider */
+  .token-row { display: flex; align-items: center; gap: 10px; }
+  .token-row input[type=range] { flex: 1; accent-color: #667eea; }
+  .token-val { font-size: 12px; font-weight: 600; color: #7f9cf5; min-width: 42px; text-align: right; }
+
+  /* Test connection */
+  .test-btn { width: 100%; background: #1a2035; border: 1px solid #2d3748; border-radius: 8px; padding: 10px; color: #a0aec0; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; margin-bottom: 10px; }
+  .test-btn:hover { border-color: #667eea; color: #7f9cf5; }
+  .test-result { font-size: 12px; padding: 8px 12px; border-radius: 8px; margin-bottom: 14px; display: none; }
+  .test-result.success { display: block; background: rgba(72,187,120,0.1); border: 1px solid rgba(72,187,120,0.3); color: #68d391; }
+  .test-result.error { display: block; background: rgba(229,62,62,0.1); border: 1px solid rgba(229,62,62,0.3); color: #fc8181; }
+  .test-result.testing { display: block; background: rgba(102,126,234,0.1); border: 1px solid rgba(102,126,234,0.2); color: #7f9cf5; }
+
+  /* Save button */
+  .save-btn { width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 8px; padding: 11px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+  .save-btn:hover { opacity: 0.9; }
+
+  .settings-divider { border: none; border-top: 1px solid #2d3748; margin: 18px 0; }
+
+  .settings-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  .settings-col-full { grid-column: 1 / -1; }
+  .adv-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 14px; user-select: none; }
+  .adv-toggle-text { font-size: 12px; color: #718096; }
+  .adv-arrow { font-size: 11px; color: #4a5568; transition: transform 0.2s; }
+  .adv-arrow.open { transform: rotate(90deg); }
+  .adv-fields { display: none; }
+  .adv-fields.open { display: block; }
+
+  /* ===== MAIN CONTENT ===== */
+  .hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center; }
+  .hero-icon { font-size: 60px; margin-bottom: 18px; }
+  .hero h1 { font-size: 26px; font-weight: 700; color: #f7fafc; margin-bottom: 8px; }
+  .hero p { font-size: 15px; color: #718096; max-width: 420px; line-height: 1.6; }
+  .hero-stats { display: flex; gap: 24px; margin-top: 28px; }
+  .stat { text-align: center; }
+  .stat-num { font-size: 26px; font-weight: 700; color: #667eea; }
+  .stat-label { font-size: 12px; color: #718096; margin-top: 2px; }
+
+  /* Chapter content */
+  .chapter-content { padding: 32px 40px; max-width: 860px; width: 100%; margin: 0 auto; }
+  .chapter-header { margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid #2d3748; }
+  .chapter-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(102,126,234,0.15); color: #7f9cf5; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin-bottom: 10px; }
+  .chapter-header h1 { font-size: 26px; font-weight: 700; color: #f7fafc; margin-bottom: 8px; line-height: 1.3; }
+  .chapter-meta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .meta-tag { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #718096; }
+  .meta-model { font-size: 10px; font-family: monospace; background: #1a2035; border: 1px solid #2d3748; border-radius: 4px; padding: 2px 6px; color: #4a5568; }
+
+  /* Content blocks */
+  .content-area { font-size: 15px; line-height: 1.8; color: #cbd5e0; }
+  .content-area h2 { font-size: 19px; font-weight: 600; color: #f7fafc; margin: 28px 0 12px; padding-left: 12px; border-left: 3px solid #667eea; }
+  .content-area h3 { font-size: 16px; font-weight: 600; color: #e2e8f0; margin: 20px 0 8px; }
+  .content-area p { margin-bottom: 14px; }
+  .content-area ul, .content-area ol { margin: 10px 0 14px 20px; }
+  .content-area li { margin-bottom: 6px; }
+  .content-area code { background: #1a2035; border: 1px solid #2d3748; border-radius: 4px; padding: 2px 6px; font-size: 13px; font-family: 'Fira Code', 'Courier New', monospace; color: #a78bfa; }
+  .content-area pre { background: #1a2035; border: 1px solid #2d3748; border-radius: 10px; padding: 16px 20px; margin: 14px 0; overflow-x: auto; }
+  .content-area pre code { background: none; border: none; padding: 0; font-size: 13px; color: #e2e8f0; }
+  .content-area strong { color: #f7fafc; font-weight: 600; }
+  .content-area blockquote { border-left: 3px solid #667eea; padding-left: 14px; margin: 14px 0; color: #a0aec0; font-style: italic; }
+  .content-area table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  .content-area th { background: #1a2035; color: #e2e8f0; padding: 10px 14px; text-align: left; font-weight: 600; border: 1px solid #2d3748; }
+  .content-area td { padding: 9px 14px; border: 1px solid #2d3748; color: #cbd5e0; }
+  .content-area tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+  /* MCQ */
+  .mcq-section { margin-top: 36px; padding-top: 28px; border-top: 1px solid #2d3748; }
+  .mcq-section h2 { font-size: 20px; font-weight: 700; color: #f7fafc; margin-bottom: 6px; }
+  .mcq-intro { font-size: 13px; color: #718096; margin-bottom: 24px; }
+  .mcq-card { background: #161b27; border: 1px solid #2d3748; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .mcq-difficulty { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .diff-easy { background: rgba(72,187,120,0.15); color: #68d391; }
+  .diff-hard { background: rgba(237,137,54,0.15); color: #f6ad55; }
+  .diff-very-hard { background: rgba(229,62,62,0.15); color: #fc8181; }
+  .mcq-question { font-size: 15px; color: #e2e8f0; font-weight: 500; margin-bottom: 14px; line-height: 1.5; }
+  .mcq-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .mcq-option { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 8px; border: 1px solid #2d3748; background: #1a2035; cursor: pointer; transition: all 0.15s; font-size: 14px; color: #a0aec0; }
+  .mcq-option:hover { border-color: #667eea; color: #e2e8f0; }
+  .mcq-option.correct { border-color: #48bb78; background: rgba(72,187,120,0.08); color: #68d391; }
+  .mcq-option.incorrect { border-color: #fc8181; background: rgba(229,62,62,0.08); color: #fc8181; }
+  .mcq-option.selected-wrong { border-color: #fc8181; background: rgba(229,62,62,0.08); color: #fc8181; }
+  .opt-label { width: 22px; min-width: 22px; height: 22px; border-radius: 50%; background: #2d3748; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #718096; }
+  .mcq-option.correct .opt-label { background: #48bb78; color: white; }
+  .mcq-option.incorrect .opt-label, .mcq-option.selected-wrong .opt-label { background: #fc8181; color: white; }
+  .reveal-btn { background: rgba(102,126,234,0.15); border: 1px solid rgba(102,126,234,0.3); border-radius: 8px; padding: 8px 14px; color: #7f9cf5; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .reveal-btn:hover { background: rgba(102,126,234,0.25); }
+  .explanation-box { margin-top: 14px; padding: 14px; background: rgba(102,126,234,0.07); border: 1px solid rgba(102,126,234,0.2); border-radius: 8px; font-size: 13px; line-height: 1.7; color: #a0aec0; display: none; }
+  .explanation-box.visible { display: block; }
+  .exp-correct { color: #68d391; font-weight: 600; margin-bottom: 6px; }
+
+  /* Loading */
+  .loading-bar { height: 3px; background: linear-gradient(90deg, #667eea, #764ba2, #667eea); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 3px; margin-bottom: 20px; }
+  .skeleton { background: linear-gradient(90deg, #1a2035 25%, #252e45 50%, #1a2035 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px; }
+  .skeleton-line { height: 14px; margin-bottom: 10px; }
+  .generating-state { text-align: center; padding: 48px 20px; }
+  .generating-spinner { width: 48px; height: 48px; border: 3px solid #2d3748; border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  .generating-title { font-size: 17px; font-weight: 600; color: #f7fafc; margin-bottom: 6px; }
+  .generating-sub { font-size: 13px; color: #718096; }
+  .progress-wrap { margin-top: 16px; background: #2d3748; border-radius: 20px; height: 4px; overflow: hidden; width: 200px; margin: 12px auto 0; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 20px; transition: width 0.4s ease; }
+
+  /* Nav */
+  .chapter-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 36px; padding-top: 20px; border-top: 1px solid #2d3748; }
+  .nav-btn { display: flex; align-items: center; gap: 6px; background: #1a2035; border: 1px solid #2d3748; border-radius: 8px; padding: 10px 16px; color: #a0aec0; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .nav-btn:hover { border-color: #667eea; color: #e2e8f0; }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .nav-btn.primary { background: rgba(102,126,234,0.15); border-color: rgba(102,126,234,0.4); color: #7f9cf5; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1a2035; border: 1px solid #2d3748; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,0.4); transform: translateY(80px); opacity: 0; transition: all 0.3s; z-index: 999; max-width: 320px; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  .sidebar-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+  .sidebar-empty p { font-size: 12px; color: #4a5568; line-height: 1.6; }
+
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn 0.3s ease forwards; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SETTINGS MODAL OVERLAY -->
+  <div class="settings-overlay" id="settingsOverlay" onclick="overlayClose(event)">
+    <div class="settings-panel" id="settingsPanel">
+      <div class="settings-header">
+        <h2>⚙️ AI Model Configuration</h2>
+        <button class="close-btn" onclick="closeSettings()">✕</button>
+      </div>
+      <div class="settings-body">
+
+        <!-- Provider grid -->
+        <div class="section-label">Choose Provider</div>
+        <div class="provider-grid" id="providerGrid"></div>
+
+        <!-- Two-column fields -->
+        <div class="settings-cols">
+
+          <!-- LEFT: API Key + Model -->
+          <div>
+            <div class="field-group">
+              <div class="field-label">API Key <span class="field-hint">stored in browser only</span></div>
+              <div class="password-wrap">
+                <input type="password" class="field-input" id="cfg-apikey" placeholder="Paste your API key…" />
+                <button class="eye-btn" onclick="toggleKeyVisibility()">👁</button>
+              </div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Model Name</div>
+              <input type="text" class="field-input mono" id="cfg-model" placeholder="e.g. gpt-4o" />
+              <div class="model-chips" id="modelChips"></div>
+            </div>
+          </div>
+
+          <!-- RIGHT: Endpoint + sliders -->
+          <div>
+            <div class="field-group">
+              <div class="field-label">API Endpoint URL</div>
+              <input type="text" class="field-input mono" id="cfg-url" placeholder="https://api.example.com/v1/chat/completions" style="font-size:11px;" />
+            </div>
+            <div class="field-group">
+              <div class="field-label">Auth Header <span class="field-hint">format</span></div>
+              <select class="field-input" id="cfg-authformat">
+                <option value="Bearer">Bearer {key}  —  standard (OpenAI, Groq, Fireworks…)</option>
+                <option value="Api-Key">Api-Key {key}  —  some providers</option>
+                <option value="x-api-key">x-api-key header  —  Anthropic Claude</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Max Tokens <span class="field-hint" id="cfg-tokens-label">8192</span></div>
+              <div class="token-row">
+                <input type="range" min="1024" max="131072" step="1024" value="8192" id="cfg-tokens"
+                  oninput="document.getElementById('cfg-tokens-label').textContent=this.value;document.getElementById('cfg-tokens-val').textContent=this.value;" />
+                <span class="token-val" id="cfg-tokens-val">8192</span>
+              </div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Temperature <span class="field-hint">creativity</span></div>
+              <div class="token-row">
+                <input type="range" min="0" max="1" step="0.05" value="0.6" id="cfg-temp"
+                  oninput="document.getElementById('cfg-temp-val').textContent=parseFloat(this.value).toFixed(2);" />
+                <span class="token-val" id="cfg-temp-val">0.60</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- end settings-cols -->
+
+        <hr class="settings-divider" style="margin:14px 0 16px;">
+
+        <!-- Test + active config + save in a row -->
+        <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+          <div style="flex:1;min-width:180px;">
+            <button class="test-btn" onclick="testConnection()" style="margin-bottom:8px;">🔌 Test Connection</button>
+            <div class="test-result" id="testResult"></div>
+            <div style="padding:10px 12px;background:#1a2035;border-radius:8px;border:1px solid #2d3748;margin-top:6px;">
+              <div style="font-size:10px;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Active config</div>
+              <div style="font-size:11px;color:#718096;line-height:1.8;" id="activeConfigInfo">—</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;min-width:160px;">
+            <button class="save-btn" onclick="saveSettings()" style="padding:12px 20px;">💾 Save &amp; Apply</button>
+            <button onclick="closeSettings()" style="padding:10px 20px;background:#1a2035;border:1px solid #2d3748;border-radius:8px;color:#718096;font-size:13px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='#4a5568'" onmouseout="this.style.borderColor='#2d3748'">Cancel</button>
+          </div>
+        </div>
+
+      </div><!-- settings-body -->
+    </div><!-- settings-panel -->
+  </div><!-- settings-overlay -->
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="app-logo">
+        <div class="logo-icon">🎓</div>
+        <div style="flex:1;min-width:0;">
+          <div class="logo-text">CS Study Generator</div>
+          <div class="logo-sub">80% marks · 24 chapters</div>
+        </div>
+        <div class="logo-actions">
+          <button class="icon-btn" id="settingsBtn" onclick="toggleSettings()" title="AI Model Settings">⚙️</button>
+        </div>
+      </div>
+
+      <!-- Active model pill -->
+      <div class="model-pill" onclick="toggleSettings()" title="Click to change model">
+        <div class="provider-dot" id="pillDot" style="background:#667eea;"></div>
+        <span class="model-pill-label" id="pillLabel">Provider:</span>
+        <span class="model-pill-name" id="pillModel">deepseek-v4-pro</span>
+        <span class="pill-edit">✎</span>
+      </div>
+
+      <div class="subject-form">
+        <input type="text" id="subjectInput" placeholder="e.g. Operating Systems, DSA…" maxlength="80" />
+        <button class="generate-btn" id="generateBtn" onclick="generateSyllabus()">⚡ Generate Syllabus</button>
+      </div>
+    </div>
+
+    <div class="chapters-list" id="chaptersList">
+      <div class="sidebar-empty" id="sidebarEmpty">
+        <p>Enter a CS subject above and generate your personalized 24-chapter study plan.</p>
+      </div>
+    </div>
+
+    <div class="sidebar-footer" id="sidebarFooter"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main" id="mainContent">
+    <div class="hero" id="heroSection">
+      <div class="hero-icon">📚</div>
+      <h1>Master any CS subject</h1>
+      <p>Study the vital 20% that guarantees 80% interview marks — 24 focused 2-hour chapters with MCQs and full explanations.</p>
+      <div class="hero-stats">
+        <div class="stat"><div class="stat-num">24</div><div class="stat-label">Chapters</div></div>
+        <div class="stat"><div class="stat-num">~48h</div><div class="stat-label">Total study</div></div>
+        <div class="stat"><div class="stat-num">80%</div><div class="stat-label">Interview score</div></div>
+        <div class="stat"><div class="stat-num">72</div><div class="stat-label">MCQs</div></div>
+      </div>
+      <div style="margin-top:28px;padding:14px 20px;background:#161b27;border:1px solid #2d3748;border-radius:10px;font-size:13px;color:#718096;max-width:380px;">
+        💡 Click <strong style="color:#a0aec0;">⚙️</strong> in the top-left to configure your AI model and API key before generating.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+//  PROVIDER REGISTRY
+// ============================================================
+const PROVIDERS = [
+  {
+    id: "fireworks",
+    name: "Fireworks AI",
+    icon: "🔥",
+    color: "#f97316",
+    url: "https://api.fireworks.ai/inference/v1/chat/completions",
+    authFormat: "Bearer",
+    badge: "Fast",
+    models: [
+      "accounts/fireworks/models/deepseek-v4-pro",
+      "accounts/fireworks/models/deepseek-r1",
+      "accounts/fireworks/models/llama-v3p3-70b-instruct",
+      "accounts/fireworks/models/mixtral-8x22b-instruct",
+      "accounts/fireworks/models/qwen2p5-72b-instruct"
+    ]
+  },
+  {
+    id: "openai",
+    name: "OpenAI",
+    icon: "🤖",
+    color: "#10a37f",
+    url: "https://api.openai.com/v1/chat/completions",
+    authFormat: "Bearer",
+    badge: "",
+    models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo", "o1-mini", "o1-preview"]
+  },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    icon: "🧠",
+    color: "#d97706",
+    url: "https://api.anthropic.com/v1/messages",
+    authFormat: "x-api-key",
+    badge: "",
+    models: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"]
+  },
+  {
+    id: "groq",
+    name: "Groq",
+    icon: "⚡",
+    color: "#8b5cf6",
+    url: "https://api.groq.com/openai/v1/chat/completions",
+    authFormat: "Bearer",
+    badge: "Free",
+    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+  },
+  {
+    id: "together",
+    name: "Together AI",
+    icon: "🤝",
+    color: "#0ea5e9",
+    url: "https://api.together.xyz/v1/chat/completions",
+    authFormat: "Bearer",
+    badge: "",
+    models: ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "deepseek-ai/DeepSeek-R1", "Qwen/Qwen2.5-72B-Instruct-Turbo", "mistralai/Mixtral-8x22B-Instruct-v0.1"]
+  },
+  {
+    id: "google",
+    name: "Google AI",
+    icon: "🌐",
+    color: "#4285f4",
+    url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    authFormat: "Bearer",
+    badge: "",
+    models: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+  },
+  {
+    id: "mistral",
+    name: "Mistral",
+    icon: "🌀",
+    color: "#ff7000",
+    url: "https://api.mistral.ai/v1/chat/completions",
+    authFormat: "Bearer",
+    badge: "",
+    models: ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest", "open-mixtral-8x22b"]
+  },
+  {
+    id: "ollama",
+    name: "Ollama (Local)",
+    icon: "🦙",
+    color: "#64748b",
+    url: "http://localhost:11434/v1/chat/completions",
+    authFormat: "Bearer",
+    badge: "Local",
+    models: ["llama3.3", "deepseek-r1:14b", "qwen2.5:72b", "mistral", "codellama", "phi4"]
+  },
+  {
+    id: "custom",
+    name: "Custom",
+    icon: "🔧",
+    color: "#94a3b8",
+    url: "",
+    authFormat: "Bearer",
+    badge: "",
+    models: []
+  }
+];
+
+// ============================================================
+//  CONFIG STATE  (defaults = Fireworks + DeepSeek)
+// ============================================================
+let cfg = {
+  providerId: "fireworks",
+  apiKey: "fw_HVJR6BNJMWKFDN6SfwjoX7",
+  model: "accounts/fireworks/models/deepseek-v4-pro",
+  url: "https://api.fireworks.ai/inference/v1/chat/completions",
+  maxTokens: 8192,
+  temperature: 0.6,
+  authFormat: "Bearer"
+};
+
+function loadCfg() {
+  try {
+    const saved = localStorage.getItem("cs_study_cfg");
+    if (saved) cfg = { ...cfg, ...JSON.parse(saved) };
+  } catch {}
+}
+function saveCfg() {
+  try { localStorage.setItem("cs_study_cfg", JSON.stringify(cfg)); } catch {}
+}
+
+// ============================================================
+//  SETTINGS UI
+// ============================================================
+function buildProviderGrid() {
+  const grid = document.getElementById("providerGrid");
+  grid.innerHTML = PROVIDERS.map(p => `
+    <div class="provider-card ${cfg.providerId === p.id ? 'selected' : ''}" id="pc-${p.id}" onclick="selectProvider('${p.id}')">
+      <div class="provider-logo" style="background:${p.color}22;">${p.icon}</div>
+      <div class="provider-info">
+        <div class="provider-name">${p.name}</div>
+        ${p.badge ? `<span class="provider-badge">${p.badge}</span>` : `<div class="provider-desc">${p.models[0] ? p.models[0].split('/').pop().slice(0,18) : 'custom'}</div>`}
+      </div>
+    </div>`).join("");
+}
+
+function selectProvider(id) {
+  const p = PROVIDERS.find(x => x.id === id);
+  if (!p) return;
+  cfg.providerId = id;
+  // update URL only if not custom and if it's a known provider URL
+  if (id !== "custom") {
+    document.getElementById("cfg-url").value = p.url;
+    document.getElementById("cfg-authformat").value = p.authFormat;
+  }
+  // update model chips
+  buildModelChips(p.models);
+  if (p.models.length > 0) {
+    document.getElementById("cfg-model").value = p.models[0];
+  }
+  // highlight selected card
+  document.querySelectorAll(".provider-card").forEach(el => el.classList.remove("selected"));
+  document.getElementById("pc-" + id).classList.add("selected");
+}
+
+function buildModelChips(models) {
+  const chips = document.getElementById("modelChips");
+  const currentModel = document.getElementById("cfg-model").value;
+  chips.innerHTML = models.map(m => {
+    const short = m.split('/').pop();
+    return `<div class="model-chip ${m === currentModel ? 'active' : ''}" onclick="pickModel('${m}')" title="${m}">${short}</div>`;
+  }).join("");
+}
+
+function pickModel(m) {
+  document.getElementById("cfg-model").value = m;
+  buildModelChips(PROVIDERS.find(p => p.id === cfg.providerId)?.models || []);
+  document.querySelectorAll(".model-chip").forEach(c => c.classList.remove("active"));
+  // re-highlight
+  document.querySelectorAll(".model-chip").forEach(c => {
+    if (c.title === m) c.classList.add("active");
+  });
+}
+
+function populateSettingsFromCfg() {
+  const p = PROVIDERS.find(x => x.id === cfg.providerId) || PROVIDERS[0];
+  buildProviderGrid();
+  document.getElementById("cfg-apikey").value = cfg.apiKey;
+  document.getElementById("cfg-model").value = cfg.model;
+  document.getElementById("cfg-url").value = cfg.url;
+  document.getElementById("cfg-tokens").value = cfg.maxTokens;
+  document.getElementById("cfg-tokens-val").textContent = cfg.maxTokens;
+  document.getElementById("cfg-tokens-label").textContent = cfg.maxTokens;
+  document.getElementById("cfg-temp").value = cfg.temperature;
+  document.getElementById("cfg-temp-val").textContent = parseFloat(cfg.temperature).toFixed(2);
+  document.getElementById("cfg-authformat").value = cfg.authFormat;
+  buildModelChips(p.models);
+}
+
+function updatePill() {
+  const p = PROVIDERS.find(x => x.id === cfg.providerId);
+  document.getElementById("pillDot").style.background = p ? p.color : "#667eea";
+  document.getElementById("pillLabel").textContent = (p ? p.name : "Custom") + ":";
+  const shortModel = cfg.model.split("/").pop();
+  document.getElementById("pillModel").textContent = shortModel;
+  document.getElementById("activeConfigInfo").innerHTML =
+    `Provider: <strong style="color:#e2e8f0">${p ? p.name : "Custom"}</strong><br>
+     Model: <code style="font-size:11px;color:#a78bfa">${cfg.model}</code><br>
+     Endpoint: <span style="color:#4a5568;word-break:break-all;">${cfg.url}</span><br>
+     Max tokens: ${cfg.maxTokens} · Temp: ${parseFloat(cfg.temperature).toFixed(2)}`;
+  document.getElementById("sidebarFooter").innerHTML =
+    `<span style="color:#3a4558;">Model: </span><span style="color:#4a5568;font-family:monospace;">${shortModel}</span>`;
+}
+
+let settingsOpen = false;
+function toggleSettings() { settingsOpen ? closeSettings() : openSettings(); }
+function openSettings() {
+  settingsOpen = true;
+  populateSettingsFromCfg();
+  document.getElementById("settingsOverlay").classList.add("open");
+  document.getElementById("settingsBtn").classList.add("active");
+}
+function closeSettings() {
+  settingsOpen = false;
+  document.getElementById("settingsOverlay").classList.remove("open");
+  document.getElementById("settingsBtn").classList.remove("active");
+}
+function overlayClose(e) {
+  if (e.target === document.getElementById("settingsOverlay")) closeSettings();
+}
+
+function saveSettings() {
+  cfg.apiKey     = document.getElementById("cfg-apikey").value.trim();
+  cfg.model      = document.getElementById("cfg-model").value.trim();
+  cfg.url        = document.getElementById("cfg-url").value.trim();
+  cfg.maxTokens  = parseInt(document.getElementById("cfg-tokens").value);
+  cfg.temperature= parseFloat(document.getElementById("cfg-temp").value);
+  cfg.authFormat = document.getElementById("cfg-authformat").value;
+  if (!cfg.url)   { showToast("⚠️ Please enter an API endpoint URL"); return; }
+  if (!cfg.model) { showToast("⚠️ Please enter a model name"); return; }
+  saveCfg();
+  updatePill();
+  closeSettings();
+  chapterCache = {};
+  showToast("✅ Settings saved! Cache cleared — chapters will regenerate with new model.");
+}
+
+function toggleKeyVisibility() {
+  const el = document.getElementById("cfg-apikey");
+  el.type = el.type === "password" ? "text" : "password";
+}
+
+function toggleAdv() {
+  const fields = document.getElementById("advFields");
+  const arrow  = document.getElementById("advArrow");
+  const open   = fields.classList.toggle("open");
+  arrow.classList.toggle("open", open);
+}
+
+async function testConnection() {
+  const key    = document.getElementById("cfg-apikey").value.trim();
+  const model  = document.getElementById("cfg-model").value.trim();
+  const url    = document.getElementById("cfg-url").value.trim();
+  const auth   = document.getElementById("cfg-authformat").value;
+  const res    = document.getElementById("testResult");
+  if (!url || !model) { showToast("Fill in URL and model first"); return; }
+
+  res.className = "test-result testing";
+  res.textContent = "🔌 Testing connection…";
+
+  try {
+    const headers = { "Content-Type": "application/json", "Accept": "application/json" };
+    if (auth === "x-api-key") {
+      headers["x-api-key"] = key;
+      headers["anthropic-version"] = "2023-06-01";
+    } else {
+      headers["Authorization"] = `${auth} ${key}`;
+    }
+
+    // Anthropic uses a different body format
+    const isAnthropic = url.includes("anthropic.com");
+    const body = isAnthropic
+      ? JSON.stringify({ model, max_tokens: 20, messages: [{ role: "user", content: "Say OK" }] })
+      : JSON.stringify({ model, max_tokens: 20, messages: [{ role: "user", content: "Say OK" }] });
+
+    const r = await fetch(url, { method: "POST", headers, body });
+    if (r.ok) {
+      res.className = "test-result success";
+      res.textContent = `✅ Connected! Status ${r.status} — model "${model}" is accessible.`;
+    } else {
+      const err = await r.text();
+      res.className = "test-result error";
+      res.textContent = `❌ Error ${r.status}: ${err.slice(0, 180)}`;
+    }
+  } catch (e) {
+    res.className = "test-result error";
+    res.textContent = `❌ Network error: ${e.message}`;
+  }
+}
+
+// ============================================================
+//  AI CALL  (supports OpenAI-compatible + Anthropic)
+// ============================================================
+async function callAI(prompt, maxTokens) {
+  const tokens = maxTokens || cfg.maxTokens;
+  const isAnthropic = cfg.url.includes("anthropic.com") || cfg.authFormat === "x-api-key";
+
+  const headers = { "Content-Type": "application/json", "Accept": "application/json" };
+  if (isAnthropic) {
+    headers["x-api-key"] = cfg.apiKey;
+    headers["anthropic-version"] = "2023-06-01";
+  } else {
+    headers["Authorization"] = `${cfg.authFormat} ${cfg.apiKey}`;
+  }
+
+  let body;
+  if (isAnthropic) {
+    body = JSON.stringify({ model: cfg.model, max_tokens: tokens, messages: [{ role: "user", content: prompt }] });
+  } else {
+    body = JSON.stringify({
+      model: cfg.model, max_tokens: tokens,
+      top_p: 1, presence_penalty: 0, frequency_penalty: 0,
+      temperature: cfg.temperature,
+      messages: [{ role: "user", content: prompt }]
+    });
+  }
+
+  const res = await fetch(cfg.url, { method: "POST", headers, body });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  // OpenAI-compatible
+  if (data.choices) return data.choices[0]?.message?.content || "";
+  // Anthropic native
+  if (data.content) return data.content.map(b => b.text || "").join("");
+  return JSON.stringify(data);
+}
+
+// ============================================================
+//  SYLLABUS + CHAPTERS
+// ============================================================
+let syllabus = [], chapterCache = {}, currentSubject = "", activeChapter = -1, isGenerating = false;
+
+function showToast(msg, dur = 3500) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), dur);
+}
+
+async function generateSyllabus() {
+  const subject = document.getElementById("subjectInput").value.trim();
+  if (!subject) { showToast("Please enter a CS subject first"); return; }
+  if (!cfg.apiKey) { openSettings(); showToast("⚠️ Please set your API key first"); return; }
+  if (!cfg.url)    { openSettings(); showToast("⚠️ Please set an API endpoint"); return; }
+  if (isGenerating) return;
+
+  isGenerating = true; currentSubject = subject; syllabus = []; chapterCache = {}; activeChapter = -1;
+  const btn = document.getElementById("generateBtn");
+  btn.disabled = true; btn.textContent = "⏳ Generating…";
+
+  const se = document.getElementById("sidebarEmpty");
+  if (se) se.remove();
+
+  document.getElementById("chaptersList").innerHTML = `<div style="padding:10px 8px;">
+    <div class="loading-bar"></div>
+    ${Array(6).fill(0).map(() => `<div style="display:flex;align-items:center;gap:10px;padding:8px 6px;margin-bottom:4px;">
+      <div class="skeleton" style="width:24px;height:24px;border-radius:6px;min-width:24px;"></div>
+      <div style="flex:1;"><div class="skeleton skeleton-line" style="width:70%;margin-bottom:4px;"></div><div class="skeleton skeleton-line" style="width:40%;height:10px;"></div></div>
+    </div>`).join("")}</div>`;
+
+  showMain(`<div class="generating-state">
+    <div class="generating-spinner"></div>
+    <div class="generating-title">Building syllabus for "${subject}"</div>
+    <div class="generating-sub">Using <code style="color:#a78bfa">${cfg.model.split('/').pop()}</code> · selecting critical 20% of topics…</div>
+    <div class="progress-wrap"><div class="progress-fill" style="width:30%" id="syl-prog"></div></div>
+  </div>`);
+
+  try {
+    const prompt = `You are an expert CS professor and interview coach. For the subject "${subject}", generate exactly 24 chapter titles covering the most critical 20% of topics that give students 80% marks in technical interviews.
+
+Rules:
+- Focus on high-frequency interview topics only
+- Arrange from fundamentals to advanced
+- Each chapter is completable in ~2 hours
+- Keep titles concise (5-8 words max)
+- Ensure broad coverage without overlap
+
+Respond ONLY with a JSON array of exactly 24 strings. No markdown, no preamble, no explanation. Example:
+["Chapter Title 1","Chapter Title 2",...]`;
+
+    const raw = await callAI(prompt, 1024);
+    const prog = document.getElementById("syl-prog");
+    if (prog) prog.style.width = "70%";
+
+    let titles;
+    try {
+      const match = raw.match(/\[[\s\S]*\]/);
+      titles = JSON.parse(match ? match[0] : raw);
+    } catch {
+      titles = raw.split("\n").filter(l => l.trim().match(/^[\d"]/))
+        .map(l => l.replace(/^[\d."\s-]+|[",\s]+$/g, "")).filter(t => t.length > 3).slice(0, 24);
+    }
+    if (!titles || titles.length < 8) throw new Error("Could not parse chapter list. Try again.");
+    while (titles.length < 24) titles.push(`Advanced Topics ${titles.length - 20}`);
+    syllabus = titles.slice(0, 24);
+
+    if (prog) prog.style.width = "100%";
+    renderSidebar(); showHero();
+    showToast(`✅ 24 chapters generated for "${subject}"`);
+  } catch (e) {
+    showMain(`<div class="generating-state"><div style="font-size:48px;margin-bottom:12px">⚠️</div>
+      <div class="generating-title">Generation failed</div>
+      <div class="generating-sub" style="max-width:340px;margin:0 auto;">${e.message}</div>
+      <button onclick="openSettings()" style="margin-top:16px;padding:8px 18px;background:rgba(102,126,234,0.2);border:1px solid rgba(102,126,234,0.4);border-radius:8px;color:#7f9cf5;cursor:pointer;font-size:13px;">⚙️ Check Settings</button>
+    </div>`);
+    showToast("Error: " + e.message, 6000);
+  }
+  btn.disabled = false; btn.textContent = "⚡ Generate Syllabus";
+  isGenerating = false;
+}
+
+function renderSidebar() {
+  document.getElementById("chaptersList").innerHTML = syllabus.map((title, i) => `
+    <div class="chapter-item ${activeChapter===i?'active':''}" id="ch-item-${i}" onclick="loadChapter(${i})">
+      <div class="ch-num" id="ch-num-${i}">${i+1}</div>
+      <div class="ch-info">
+        <div class="ch-title">${title}</div>
+        <div class="ch-time">~2 hours · 3 MCQs</div>
+      </div>
+      <div class="ch-status ${chapterCache[i]?'done':''}" id="ch-status-${i}"></div>
+    </div>`).join("");
+}
+
+async function loadChapter(idx) {
+  if (idx < 0 || idx >= syllabus.length) return;
+  activeChapter = idx; renderSidebar();
+  if (chapterCache[idx]) { renderChapter(idx, chapterCache[idx]); return; }
+
+  const st = document.getElementById(`ch-status-${idx}`);
+  if (st) st.classList.add("loading");
+
+  showMain(`<div class="chapter-content">
+    <div class="loading-bar"></div>
+    <div class="generating-state" style="padding:40px 0;">
+      <div class="generating-spinner"></div>
+      <div class="generating-title">Generating Chapter ${idx+1}</div>
+      <div class="generating-sub">Using <code style="color:#a78bfa">${cfg.model.split('/').pop()}</code> — comprehensive content + 3 MCQs…</div>
+    </div>
+  </div>`);
+
+  try {
+    const title = syllabus[idx];
+    const prompt = `You are an expert CS interview coach writing a focused study chapter for "${currentSubject}" students preparing for technical interviews.
+
+Chapter ${idx+1} of 24: "${title}"
+
+Write a comprehensive 2-hour study chapter:
+
+## Overview
+[2-3 sentences on WHY this topic matters in interviews]
+
+## Core Concepts
+[3-5 critical concepts with clear explanations, examples, and code where useful]
+
+## Key Algorithms / Techniques
+[Important algorithms or patterns with pseudocode or code examples]
+
+## Common Interview Patterns
+[2-4 specific interview question patterns with solution approaches]
+
+## Quick Reference
+[Table or bullets of the most important facts, complexities, formulas to memorize]
+
+## Interview Tips
+[3-5 specific tips for answering this topic in interviews]
+
+---
+CHAPTER_MCQ_START
+{
+  "mcqs": [
+    {
+      "difficulty": "Easy",
+      "question": "...",
+      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+      "correct": 0,
+      "explanation_correct": "Full explanation of why this is correct",
+      "explanation_wrong": {"1": "Why B is wrong", "2": "Why C is wrong", "3": "Why D is wrong"}
+    },
+    {
+      "difficulty": "Hard",
+      "question": "...",
+      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+      "correct": 2,
+      "explanation_correct": "Full explanation",
+      "explanation_wrong": {"0": "Why A is wrong", "1": "Why B is wrong", "3": "Why D is wrong"}
+    },
+    {
+      "difficulty": "Very Hard",
+      "question": "...",
+      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+      "correct": 1,
+      "explanation_correct": "Full explanation",
+      "explanation_wrong": {"0": "Why A is wrong", "2": "Why C is wrong", "3": "Why D is wrong"}
+    }
+  ]
+}
+CHAPTER_MCQ_END
+
+Rules: Hard/Very Hard must be genuinely tricky — edge cases, time/space tradeoffs, subtle bugs. "correct" is the 0-based index of the correct answer.`;
+
+    const raw = await callAI(prompt, Math.min(cfg.maxTokens, 8192));
+    const parts = raw.split("CHAPTER_MCQ_START");
+    const content = parts[0].trim();
+    let mcqs = [];
+    if (parts[1]) {
+      try {
+        const jPart = parts[1].split("CHAPTER_MCQ_END")[0].trim();
+        const match = jPart.match(/\{[\s\S]*\}/);
+        mcqs = JSON.parse(match ? match[0] : jPart).mcqs || [];
+      } catch {}
+    }
+    chapterCache[idx] = { content, mcqs };
+    renderChapter(idx, chapterCache[idx]);
+    if (st) { st.classList.remove("loading"); st.classList.add("done"); }
+    renderSidebar();
+  } catch (e) {
+    showMain(`<div class="generating-state"><div style="font-size:48px;margin-bottom:12px">⚠️</div>
+      <div class="generating-title">Chapter load failed</div>
+      <div class="generating-sub">${e.message}</div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:16px;">
+        <button onclick="loadChapter(${idx})" class="reveal-btn">Retry</button>
+        <button onclick="openSettings()" style="padding:8px 14px;background:#1a2035;border:1px solid #2d3748;border-radius:8px;color:#718096;cursor:pointer;font-size:13px;">⚙️ Settings</button>
+      </div>
+    </div>`);
+    if (st) st.classList.remove("loading");
+  }
+}
+
+function renderChapter(idx, data) {
+  const modelShort = cfg.model.split('/').pop();
+  showMain(`<div class="chapter-content fade-in">
+    <div class="chapter-header">
+      <div class="chapter-badge">📖 Chapter ${idx+1} of ${syllabus.length}</div>
+      <h1>${syllabus[idx]}</h1>
+      <div class="chapter-meta">
+        <span class="meta-tag">⏱ ~2 hours</span>
+        <span class="meta-tag">🎯 ${currentSubject}</span>
+        <span class="meta-tag">📝 3 MCQs</span>
+        <span class="meta-model" title="${cfg.model}">${modelShort}</span>
+      </div>
+    </div>
+    <div class="content-area">${parseMarkdown(data.content)}</div>
+    <div class="mcq-section">
+      <h2>🧠 Test Your Knowledge</h2>
+      <p class="mcq-intro">3 questions — Easy, Hard, Very Hard. Pick an answer to auto-reveal, or click "Show Explanation".</p>
+      ${data.mcqs.map((q, qi) => renderMCQ(q, idx, qi)).join("")}
+    </div>
+    <div class="chapter-nav">
+      <button class="nav-btn" onclick="loadChapter(${idx-1})" ${idx===0?"disabled":""}>← Previous</button>
+      <span style="font-size:13px;color:#4a5568;">Chapter ${idx+1} / ${syllabus.length}</span>
+      <button class="nav-btn primary" onclick="loadChapter(${idx+1})" ${idx===syllabus.length-1?"disabled":""}>Next →</button>
+    </div>
+  </div>`);
+}
+
+function renderMCQ(q, chIdx, qIdx) {
+  const diffClass = {"Easy":"diff-easy","Hard":"diff-hard","Very Hard":"diff-very-hard"}[q.difficulty]||"diff-easy";
+  const diffIcon  = {"Easy":"🟢","Hard":"🟠","Very Hard":"🔴"}[q.difficulty]||"🟢";
+  const letters   = ["A","B","C","D"];
+  const id        = `mcq-${chIdx}-${qIdx}`;
+  const opts      = (q.options||[]).map((opt,oi)=>`
+    <div class="mcq-option" id="${id}-opt-${oi}" onclick="selectOption('${id}',${oi},${q.correct})">
+      <div class="opt-label">${letters[oi]}</div>
+      <div>${opt.replace(/^[A-D]\)\s*/,"")}</div>
+    </div>`).join("");
+  const wrongExp  = Object.entries(q.explanation_wrong||{}).map(([k,v])=>
+    `<div style="margin-top:8px;"><span style="color:#fc8181;">Option ${letters[parseInt(k)]}:</span> ${v}</div>`).join("");
+  return `<div class="mcq-card">
+    <div class="mcq-difficulty ${diffClass}">${diffIcon} ${q.difficulty}</div>
+    <div class="mcq-question">Q${qIdx+1}. ${q.question}</div>
+    <div class="mcq-options">${opts}</div>
+    <button class="reveal-btn" id="${id}-reveal" onclick="revealExplanation('${id}')">Show Explanation</button>
+    <div class="explanation-box" id="${id}-exp">
+      <div class="exp-correct">✅ Correct Answer: Option ${letters[q.correct]}</div>
+      <div style="margin-bottom:10px;color:#a0aec0;">${q.explanation_correct||""}</div>
+      <div style="font-size:12px;font-weight:600;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Why other options are wrong:</div>
+      <div>${wrongExp}</div>
+    </div>
+  </div>`;
+}
+
+function selectOption(id, selected, correct) {
+  document.querySelectorAll(`[id^="${id}-opt-"]`).forEach((el,i)=>{
+    el.onclick = null;
+    if (i===correct) el.classList.add("correct");
+    else if (i===selected) el.classList.add("selected-wrong");
+    else el.classList.add("incorrect");
+  });
+  revealExplanation(id);
+}
+function revealExplanation(id) {
+  const box = document.getElementById(`${id}-exp`);
+  const btn = document.getElementById(`${id}-reveal`);
+  if (box) box.classList.add("visible");
+  if (btn) btn.style.display = "none";
+}
+
+function parseMarkdown(md) {
+  if (!md) return "";
+  return md
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/```(\w*)\n([\s\S]*?)```/g,(_,lang,code)=>`<pre><code class="language-${lang}">${code.trim()}</code></pre>`)
+    .replace(/`([^`]+)`/g,"<code>$1</code>")
+    .replace(/^## (.+)$/gm,"<h2>$1</h2>")
+    .replace(/^### (.+)$/gm,"<h3>$1</h3>")
+    .replace(/^#### (.+)$/gm,"<h3>$1</h3>")
+    .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g,"<em>$1</em>")
+    .replace(/^---$/gm,"<hr style='border:none;border-top:1px solid #2d3748;margin:20px 0;'>")
+    .replace(/^\> (.+)$/gm,"<blockquote>$1</blockquote>")
+    .replace(/^\| (.+) \|$/gm,m=>{
+      const cells=m.split("|").filter((c,i,a)=>i>0&&i<a.length-1).map(c=>c.trim());
+      return `<tr>${cells.map(c=>c.match(/^[-:]+$/)?null:`<td>${c}</td>`).filter(Boolean).join("")}</tr>`;
+    })
+    .replace(/(<tr>[\s\S]*?<\/tr>)/g,m=>`<table>${m.replace(/<tr>(<td>.*?<\/td>)<\/tr>/,(r,c)=>`<tr>${c.replace(/<td>/g,"<th>").replace(/<\/td>/g,"</th>")}</tr>`)}</table>`)
+    .replace(/^\s*[-*] (.+)$/gm,"<li>$1</li>")
+    .replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g,"<ul>$1</ul>")
+    .replace(/^\d+\. (.+)$/gm,"<li>$1</li>")
+    .replace(/\n\n/g,"</p><p>")
+    .replace(/^(?!<[hupltb]|<\/[hupltb])(.+)$/gm,m=>m.trim()&&!m.startsWith("<")?`<p>${m}</p>`:m)
+    .replace(/<p><\/p>/g,"")
+    .replace(/<p>(<[hul])/g,"$1")
+    .replace(/(<\/[hul][^>]*>)<\/p>/g,"$1");
+}
+
+function showMain(html) { document.getElementById("mainContent").innerHTML = html; }
+
+function showHero() {
+  showMain(`<div class="hero">
+    <div class="hero-icon">✅</div>
+    <h1>Syllabus ready for "${currentSubject}"</h1>
+    <p>24 focused chapters generated. Click any chapter in the sidebar to start studying.</p>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-num">24</div><div class="stat-label">Chapters</div></div>
+      <div class="stat"><div class="stat-num">~48h</div><div class="stat-label">Total study</div></div>
+      <div class="stat"><div class="stat-num">80%</div><div class="stat-label">Interview score</div></div>
+      <div class="stat"><div class="stat-num">72</div><div class="stat-label">MCQs</div></div>
+    </div>
+    <button onclick="loadChapter(0)" style="margin-top:24px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:10px;padding:12px 28px;color:white;font-size:14px;font-weight:600;cursor:pointer;">Start Chapter 1 →</button>
+  </div>`);
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+loadCfg();
+updatePill();
+document.getElementById("subjectInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") generateSyllabus();
+});
+// Auto-open settings if no API key saved
+if (!cfg.apiKey) setTimeout(openSettings, 600);
+</script>
+</body>
+</html>
